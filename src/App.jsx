@@ -1,52 +1,17 @@
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import Landing from './components/Landing';
-import Map from './components/Map';
-import Level from './components/Level';
-import BasicsIntro from './components/BasicsIntro';
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
-import Practice from './components/Practice';
-import Leaderboard from './components/Leaderboard';
-import Profile from './components/Profile';
-import AITutor from './components/AITutor';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import PathScreen from './components/PathScreen';
+import LessonScreen from './components/LessonScreen';
 
 function App() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const isFullScreen = location.pathname === '/' || location.pathname === '/intro';
-
-  if (isFullScreen) {
-    return (
-      <div className="app">
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/intro" element={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-              <BasicsIntro onDone={() => navigate('/map')} />
-            </div>
-          } />
-        </Routes>
-      </div>
-    );
-  }
-
   return (
-    <div className="app-container">
-      <Sidebar />
-      <div className="main-content">
-        <TopBar />
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <Routes>
-            <Route path="/map" element={<Map />} />
-            <Route path="/level/:id" element={<Level />} />
-            <Route path="/practice" element={<Practice />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="*" element={<Map />} />
-          </Routes>
-        </div>
-      </div>
-      <AITutor />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      <Routes>
+        <Route path="/" element={<PathScreen />} />
+        <Route path="/path" element={<PathScreen />} />
+        <Route path="/map" element={<PathScreen />} />
+        <Route path="/level/:id" element={<LessonScreen />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }

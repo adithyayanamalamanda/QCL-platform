@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuantumQuest — Duolingo for Quantum Computing</title>
+  <meta name="description" content="A Duolingo-style gamified platform for learning quantum computing algorithms through simulations and hands-on exercises.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          animation: {
+            'spin-slow': 'spin 12s linear infinite',
+            'bounce-subtle': 'bounceSubtle 3s ease-in-out infinite',
+            'pulse-glow': 'pulseGlow 2.5s infinite',
+            'slideUp': 'slideUp 0.35s ease-out',
+            'fadeIn': 'fadeIn 0.35s ease-out'
+          },
+          keyframes: {
+            bounceSubtle: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-6px)' }
+            },
+            pulseGlow: {
+              '0%, 100%': { boxShadow: '0 0 15px rgba(139, 92, 246, 0.4)' },
+              '50%': { boxShadow: '0 0 30px rgba(6, 182, 212, 0.7)' }
+            },
+            slideUp: {
+              '0%': { transform: 'translateY(100%)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' }
+            },
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'scale(0.98)' },
+              '100%': { opacity: '1', transform: 'scale(1)' }
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- React 18 & Babel CDN for standalone execution -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 selection:bg-purple-600 selection:text-white min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- QUANTUM SIMULATION ENGINE ---
+    const COMPLEX = {
+      create: (r = 0, i = 0) => ({ r, i }),
+      add: (a, b) => ({ r: a.r + b.r, i: a.i + b.i }),
+      sub: (a, b) => ({ r: a.r - b.r, i: a.i - b.i }),
+      mul: (a, b) => ({ r: a.r * b.r - a.i * b.i, i: a.r * b.i + a.i * b.r }),
+      mulScalar: (a, s) => ({ r: a.r * s, i: a.i * s }),
+      magSq: (a) => a.r * a.r + a.i * a.i
+    };
+
+    const SQRT1_2 = Math.SQRT1_2;
+
+    const GATES = {
+      X: [
+        [COMPLEX.create(0, 0), COMPLEX.create(1, 0)],
+        [COMPLEX.create(1, 0), COMPLEX.create(0, 0)]
+      ],
+      Y: [
+        [COMPLEX.create(0, 0), COMPLEX.create(0, -1)],
+        [COMPLEX.create(0, 1), COMPLEX.create(0, 0)]
+      ],
+      Z: [
+        [COMPLEX.create(1, 0), COMPLEX.create(0, 0)],
+        [COMPLEX.create(0, 0), COMPLEX.create(-1, 0)]
+      ],
+      H: [
+        [COMPLEX.create(SQRT1_2, 0), COMPLEX.create(SQRT1_2, 0)],
+        [COMPLEX.create(SQRT1_2, 0), COMPLEX.create(-SQRT1_2, 0)]
+      ]
+    };
+
+    function applyGate(gateMatrix, state = [COMPLEX.create(1, 0), COMPLEX.create(0, 0)]) {
+      const [alpha, beta] = state;
+      const newAlpha = COMPLEX.add(
+        COMPLEX.mul(gateMatrix[0][0], alpha),
+        COMPLEX.mul(gateMatrix[0][1], beta)
+      );
+      const newBeta = COMPLEX.add(
+        COMPLEX.mul(gateMatrix[1][0], alpha),
+        COMPLEX.mul(gateMatrix[1][1], beta)
+      );
+      return [newAlpha, newBeta];
+    }
+
+    function getBlochCoordinates(state) {
+      const [alpha, beta] = state;
+      const conjBeta = COMPLEX.create(beta.r, -beta.i);
+      const alphaConjBeta = COMPLEX.mul(alpha, conjBeta);
+      const x = 2 * alphaConjBeta.r;
+      const y = 2 * (alpha.r * beta.i - alpha.i * beta.r);
+      const z = COMPLEX.magSq(alpha) - COMPLEX.magSq(beta);
+      return { x, y, z };
+    }
+
+    function getProbabilities(state) {
+      const p0 = COMPLEX.magSq(state[0]);
+      const p1 = COMPLEX.magSq(state[1]);
+      const total = p0 + p1 || 1;
+      return {
+        p0: Math.round((p0 / total) * 1000) / 10,
+        p1: Math.round((p1 / total) * 1000) / 10,
+        raw0: p0 / total
+      };
+    }
+
+    function simulateTwoQubit(gates = []) {
+      let state = [COMPLEX.create(1, 0), COMPLEX.create(0, 0), COMPLEX.create(0, 0), COMPLEX.create(0, 0)];
+      for (const g of gates) {
+        if (g.type === 'H' && g.target === 0) {
+          const ns = [COMPLEX.create(0, 0), COMPLEX.create(0, 0), COMPLEX.create(0, 0), COMPLEX.create(0, 0)];
+          ns[0] = COMPLEX.mulScalar(COMPLEX.add(state[0], state[2]), SQRT1_2);
+          ns[1] = COMPLEX.mulScalar(COMPLEX.add(state[1], state[3]), SQRT1_2);
+          ns[2] = COMPLEX.mulScalar(COMPLEX.sub(state[0], state[2]), SQRT1_2);
+          ns[3] = COMPLEX.mulScalar(COMPLEX.sub(state[1], state[3]), SQRT1_2);
+          state = ns;
+        } else if (g.type === 'H' && g.target === 1) {
+          const ns = [COMPLEX.create(0, 0), COMPLEX.create(0, 0), COMPLEX.create(0, 0), COMPLEX.create(0, 0)];
+          ns[0] = COMPLEX.mulScalar(COMPLEX.add(state[0], state[1]), SQRT1_2);
+          ns[1] = COMPLEX.mulScalar(COMPLEX.sub(state[0], state[1]), SQRT1_2);
+          ns[2] = COMPLEX.mulScalar(COMPLEX.add(state[2], state[3]), SQRT1_2);
+          ns[3] = COMPLEX.mulScalar(COMPLEX.sub(state[2], state[3]), SQRT1_2);
+          state = ns;
+        } else if (g.type === 'CNOT') {
+          state = [state[0], state[1], state[3], state[2]];
+        } else if (g.type === 'ORACLE_11') {
+          state[3] = COMPLEX.mulScalar(state[3], -1);
+        } else if (g.type === 'DIFFUSION') {
+          const avg = COMPLEX.mulScalar(
+            COMPLEX.add(COMPLEX.add(state[0], state[1]), COMPLEX.add(state[2], state[3])),
+            0.25
+          );
+          state = state.map(amp => COMPLEX.sub(COMPLEX.mulScalar(avg, 2), amp));
+        }
+      }
+      const probs = state.map(amp => COMPLEX.magSq(amp));
+      const sum = probs.reduce((a, b) => a + b, 0) || 1;
+      return {
+        '00': Math.round((probs[0] / sum) * 1000) / 10,
+        '01': Math.round((probs[1] / sum) * 1000) / 10,
+        '10': Math.round((probs[2] / sum) * 1000) / 10,
+        '11': Math.round((probs[3] / sum) * 1000) / 10
+      };
+    }
+
+    // --- CURRICULUM LEVELS DATA (6 Levels) ---
+    const LEVELS = [
+      {
+        id: 1,
+        title: "What is a Qubit?",
+        subtitle: "Superposition & Coin-Flip Analogy",
+        icon: "⚛️",
+        module: "Quantum Fundamentals",
+        xpReward: 35,
+        overview: {
+          tag: "CORE CONCEPT",
+          heading: "Classical Bit vs. Quantum Qubit",
+          description: "A classical bit is like a coin lying flat on a table (0 or 1). A Qubit is like a spinning coin in mid-air—it exists in a Superposition of both |0⟩ and |1⟩ at once!",
+          takeaway: "Superposition allows a quantum computer to process vast possibilities simultaneously before measurement."
+        },
+        simulator: {
+          title: "Superposition Playground",
+          instructions: "Click 'Spin Coin' or apply 'Hadamard (H)' to put the qubit in a 50/50 superposition!",
+          hint: "The Hadamard gate creates an equal superposition of |0⟩ and |1⟩."
+        },
+        quiz: {
+          question: "What is the primary difference between a classical bit and a quantum qubit?",
+          options: [
+            "A qubit can only hold negative numbers.",
+            "A qubit can exist in a superposition of both |0⟩ and |1⟩ simultaneously.",
+            "A qubit is always 100 times faster than any CPU.",
+            "A qubit never needs measurement."
+          ],
+          correctIndex: 1,
+          explanation: "Superposition allows a qubit to hold a blend of |0⟩ and |1⟩ amplitudes simultaneously until it is measured!"
+        }
+      },
+      {
+        id: 2,
+        title: "Quantum Gates 101",
+        subtitle: "Pauli-X & Hadamard (H) Gates",
+        icon: "⚡",
+        module: "Quantum Fundamentals",
+        xpReward: 35,
+        overview: {
+          tag: "GATE OPERATIONS",
+          heading: "Manipulating Quantum States",
+          description: "Quantum gates are reversible matrix rotations on the Bloch Sphere. The Pauli-X gate acts as a quantum NOT (flipping |0⟩ to |1⟩), while Hadamard (H) transforms definite states into superpositions.",
+          takeaway: "Quantum gates preserve total probability (100%) through unitary rotations."
+        },
+        simulator: {
+          title: "Single Qubit Gate Lab",
+          instructions: "Apply Pauli-X to flip the qubit, or Hadamard (H) to enter superposition. Watch the Bloch vector and probability bars update!",
+          hint: "X flips |0⟩ to |1⟩. H creates |+⟩ = (|0⟩ + |1⟩)/√2."
+        },
+        quiz: {
+          question: "If a qubit starts in |0⟩ and you apply a Pauli-X gate, what state does it become?",
+          options: [
+            "|+⟩ equal superposition (50% |0⟩, 50% |1⟩)",
+            "|1⟩ state with 100% probability",
+            "It turns off completely",
+            "|0⟩ state with no change"
+          ],
+          correctIndex: 1,
+          explanation: "The Pauli-X gate is the quantum NOT gate: X|0⟩ = |1⟩."
+        }
+      },
+      {
+        id: 3,
+        title: "Building Circuits",
+        subtitle: "Chaining Gates & Interference",
+        icon: "🔀",
+        module: "Quantum Circuits",
+        xpReward: 35,
+        overview: {
+          tag: "CIRCUIT FLOW",
+          heading: "Interference & Reversibility",
+          description: "When we chain multiple quantum gates together, quantum amplitudes interfere constructively or destructively. Because H is its own inverse (H² = I), applying H twice in a row returns the qubit to |0⟩!",
+          takeaway: "Hadamard is self-inverse: H(H|0⟩) = |0⟩."
+        },
+        simulator: {
+          title: "Circuit Sequencer",
+          instructions: "Chain [H] then [H] to observe how quantum interference cancels the superposition and restores |0⟩ with 100% probability!",
+          hint: "Add [H] [H] to verify H² = I."
+        },
+        quiz: {
+          question: "What happens when you apply the Hadamard gate (H) TWICE in a row to a qubit starting in |0⟩?",
+          options: [
+            "It remains in superposition forever",
+            "It undergoes random collapse",
+            "It returns back to the original |0⟩ state (H² = I)",
+            "It becomes |1⟩"
+          ],
+          correctIndex: 2,
+          explanation: "The Hadamard matrix satisfies H = H⁻¹, meaning H applied twice cancels itself out!"
+        }
+      },
+      {
+        id: 4,
+        title: "Entanglement Basics",
+        subtitle: "CNOT Gate & Bell States",
+        icon: "🌐",
+        module: "Quantum Information",
+        xpReward: 35,
+        overview: {
+          tag: "QUANTUM MAGIC",
+          heading: "Spooky Action & Bell Pairs",
+          description: "Entanglement joins two qubits so their fates are locked together. Applying H to Qubit 0 and CNOT between Q0 and Q1 creates the Bell state: (|00⟩ + |11⟩)/√2.",
+          takeaway: "Measuring Qubit 0 as |1⟩ guarantees Qubit 1 will be |1⟩ instantaneously."
+        },
+        simulator: {
+          title: "Bell State Generator (2 Qubits)",
+          instructions: "1. Apply H on Qubit 0. 2. Apply CNOT (Q0 ➔ Q1). Watch |00⟩ and |11⟩ both reach 50%, while |01⟩ and |10⟩ stay 0%!",
+          hint: "Entanglement links two qubits into one unified wave function."
+        },
+        quiz: {
+          question: "In the Bell State (|00⟩ + |11⟩)/√2, if you measure Qubit 0 and observe |1⟩, what will Qubit 1 immediately be?",
+          options: [
+            "50% chance of 0, 50% chance of 1",
+            "100% guaranteed to be |1⟩",
+            "100% guaranteed to be |0⟩",
+            "Undetermined until measured"
+          ],
+          correctIndex: 1,
+          explanation: "Because only |00⟩ and |11⟩ exist in the Bell state, measuring Q0 as 1 collapses the entire system into |11⟩!"
+        }
+      },
+      {
+        id: 5,
+        title: "Measurement & Probability",
+        subtitle: "Wave Function Collapse & Born Rule",
+        icon: "📈",
+        module: "Quantum Measurement",
+        xpReward: 35,
+        overview: {
+          tag: "THE BORN RULE",
+          heading: "Observation Collapses the State",
+          description: "Before measurement, a qubit in α|0⟩ + β|1⟩ is in superposition. The instant it is observed, it collapses to |0⟩ with probability |α|² or |1⟩ with probability |β|².",
+          takeaway: "Quantum probability is deterministic before measurement, and probabilistic at the moment of measurement."
+        },
+        simulator: {
+          title: "Measurement Chamber",
+          instructions: "Prepare a superposition with [H], then trigger Single Shot or 100 Shots to watch the collapse histogram live!",
+          hint: "The Born rule states that Probability = |Amplitude|²."
+        },
+        quiz: {
+          question: "If a qubit is in state |+⟩ = (1/√2)|0⟩ + (1/√2)|1⟩, what is the probability of measuring |0⟩?",
+          options: [
+            "100%",
+            "25%",
+            "50% (since |1/√2|² = 1/2 = 50%)",
+            "0%"
+          ],
+          correctIndex: 2,
+          explanation: "According to the Born rule, probability = |1/√2|² = 1/2 = 50%!"
+        }
+      },
+      {
+        id: 6,
+        title: "Mini Algorithm",
+        subtitle: "Grover's Search Speedup",
+        icon: "✨",
+        module: "Quantum Algorithms",
+        xpReward: 40,
+        overview: {
+          tag: "ALGORITHM SPOTLIGHT",
+          heading: "Grover's Search Algorithm",
+          description: "Classical search takes O(N) queries for N items. Grover's quantum search finds it in O(√N) by flipping the target phase (Oracle) and inverting amplitudes about the mean (Diffusion).",
+          takeaway: "Grover uses wave interference to amplify the probability of the correct answer."
+        },
+        simulator: {
+          title: "Grover 2-Qubit Search Engine",
+          instructions: "Execute: 1. Superposition ➔ 2. Phase Oracle (Target |11⟩) ➔ 3. Diffusion (Amplifier). Watch the probability of |11⟩ jump to nearly 100%!",
+          hint: "Oracle marks the target, Diffusion amplifies it!"
+        },
+        quiz: {
+          question: "How does Grover's Algorithm achieve its quantum speedup over classical search?",
+          options: [
+            "By checking every combination on separate hardware chips",
+            "By flipping the phase of the target and using interference to amplify its amplitude",
+            "By randomly guessing until it succeeds",
+            "By reducing database size"
+          ],
+          correctIndex: 1,
+          explanation: "Grover marks the solution and uses amplitude amplification (Diffusion) to boost the winner to ~100%!"
+        }
+      }
+    ];
+
+    // --- BLOCH SPHERE CANVAS COMPONENT ---
+    function BlochSphere({ state = [COMPLEX.create(1, 0), COMPLEX.create(0, 0)] }) {
+      const canvasRef = useRef(null);
+      const { x, y, z } = getBlochCoordinates(state);
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = 85;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Gradient sphere
+        const grad = ctx.createRadialGradient(cx, cy, 20, cx, cy, r);
+        grad.addColorStop(0, 'rgba(139, 92, 246, 0.2)');
+        grad.addColorStop(1, 'rgba(15, 23, 42, 0.6)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Wireframe circle
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Equatorial Ring
+        ctx.strokeStyle = 'rgba(99, 102, 241, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, r, r * 0.35, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Z-axis line
+        ctx.strokeStyle = '#a78bfa';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r - 10);
+        ctx.lineTo(cx, cy + r + 10);
+        ctx.stroke();
+
+        // Axis labels
+        ctx.fillStyle = '#a78bfa';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText('|0⟩', cx + 6, cy - r + 5);
+        ctx.fillStyle = '#f472b6';
+        ctx.fillText('|1⟩', cx + 6, cy + r + 5);
+
+        // Vector arrow
+        const px = cx + (x * 0.7 - y * 0.4) * r;
+        const py = cy - z * r + (x * 0.2 + y * 0.1) * r * 0.3;
+
+        ctx.strokeStyle = '#06b6d4';
+        ctx.lineWidth = 3.5;
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      }, [x, y, z]);
+
+      return (
+        <div className="flex flex-col items-center bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+          <canvas ref={canvasRef} width="220" height="220" className="rounded-xl" />
+          <div className="flex gap-2 text-[11px] font-mono text-slate-300 mt-1">
+            <span>x: {x.toFixed(2)}</span>
+            <span>y: {y.toFixed(2)}</span>
+            <span>z: {z.toFixed(2)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // --- PROBABILITY BARS ---
+    function ProbabilityBars({ probabilities = { p0: 100, p1: 0 }, isTwoQubit = false }) {
+      if (isTwoQubit) {
+        return (
+          <div className="w-full bg-slate-900/90 rounded-2xl p-4 border border-slate-800 space-y-2">
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+              2-Qubit Probabilities
+            </div>
+            {['00', '01', '10', '11'].map((st) => {
+              const val = probabilities[st] || 0;
+              return (
+                <div key={st} className="space-y-0.5">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-purple-300 font-bold">|{st}⟩</span>
+                    <span className="text-white font-bold">{val.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-300" style={{ width: `${Math.max(2, val)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      return (
+        <div className="w-full bg-slate-900/90 rounded-2xl p-4 border border-slate-800 space-y-3">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+            Measurement Probabilities
+          </div>
+          <div>
+            <div className="flex justify-between text-xs font-mono mb-1">
+              <span className="text-purple-300 font-bold">|0⟩ Ground State</span>
+              <span className="text-white font-bold">{probabilities.p0.toFixed(1)}%</span>
+            </div>
+            <div className="w-full h-3.5 bg-slate-950 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 transition-all duration-300" style={{ width: `${Math.max(2, probabilities.p0)}%` }} />
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between text-xs font-mono mb-1">
+              <span className="text-cyan-300 font-bold">|1⟩ Excited State</span>
+              <span className="text-white font-bold">{probabilities.p1.toFixed(1)}%</span>
+            </div>
+            <div className="w-full h-3.5 bg-slate-950 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-cyan-600 to-teal-400 transition-all duration-300" style={{ width: `${Math.max(2, probabilities.p1)}%` }} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN DUOLINGO APP COMPONENT ---
+    function App() {
+      const [view, setView] = useState('path'); // 'path' | 'lesson'
+      const [activeLevelId, setActiveLevelId] = useState(1);
+      const [lessonStep, setLessonStep] = useState('overview'); // 'overview' | 'simulator' | 'quiz' | 'results'
+      const [mistakes, setMistakes] = useState(0);
+      const [feedback, setFeedback] = useState(null);
+
+      // Persisted Gamification state
+      const [stats, setStats] = useState(() => {
+        const saved = localStorage.getItem('qq_standalone_stats');
+        return saved ? JSON.parse(saved) : { xp: 0, streak: 4, hearts: 5, completed: [], levelStars: {} };
+      });
+
+      const saveStats = (newStats) => {
+        setStats(newStats);
+        localStorage.setItem('qq_standalone_stats', JSON.stringify(newStats));
+      };
+
+      const activeLevel = LEVELS.find(l => l.id === activeLevelId) || LEVELS[0];
+
+      // Simulator local state
+      const [qubitState, setQubitState] = useState([COMPLEX.create(1, 0), COMPLEX.create(0, 0)]);
+      const [twoQubitProbs, setTwoQubitProbs] = useState({ '00': 100, '01': 0, '10': 0, '11': 0 });
+      const [twoQubitGates, setTwoQubitGates] = useState([]);
+      const [shots, setShots] = useState({ c0: 0, c1: 0, total: 0 });
+
+      const singleProbs = getProbabilities(qubitState);
+
+      const openLevel = (lvlId) => {
+        setActiveLevelId(lvlId);
+        setLessonStep('overview');
+        setMistakes(0);
+        setFeedback(null);
+        setQubitState([COMPLEX.create(1, 0), COMPLEX.create(0, 0)]);
+        setTwoQubitGates([]);
+        setTwoQubitProbs({ '00': 100, '01': 0, '10': 0, '11': 0 });
+        setShots({ c0: 0, c1: 0, total: 0 });
+        setView('lesson');
+      };
+
+      const handleQuiz = (idx) => {
+        if (idx === activeLevel.quiz.correctIndex) {
+          saveStats({ ...stats, xp: stats.xp + 10 });
+          setFeedback({ isCorrect: true, text: activeLevel.quiz.explanation });
+        } else {
+          const newHearts = Math.max(0, stats.hearts - 1);
+          setMistakes(m => m + 1);
+          saveStats({ ...stats, hearts: newHearts });
+          setFeedback({ isCorrect: false, text: activeLevel.quiz.explanation });
+        }
+      };
+
+      const handleContinueFromFeedback = () => {
+        if (feedback?.isCorrect) {
+          const stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+          const completedSet = new Set(stats.completed);
+          completedSet.add(activeLevel.id);
+          const starsMap = { ...stats.levelStars, [activeLevel.id]: Math.max(stats.levelStars[activeLevel.id] || 0, stars) };
+          saveStats({
+            ...stats,
+            xp: stats.xp + 25,
+            completed: Array.from(completedSet),
+            levelStars: starsMap
+          });
+          setFeedback(null);
+          setLessonStep('results');
+        } else {
+          setFeedback(null);
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          {/* TOP BAR */}
+          <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+            <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <div onClick={() => setView('path')} className="flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-2xl">⚛️</span>
+                <span className="font-extrabold text-lg text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-300 to-cyan-400">
+                  QuantumQuest
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-sm font-bold">
+                <div onClick={() => saveStats({ ...stats, streak: stats.streak + 1 })} title="Click to boost streak" className="flex items-center gap-1 bg-slate-900 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-xl cursor-pointer">
+                  🔥 {stats.streak}
+                </div>
+                <div className="flex items-center gap-1 bg-slate-900 border border-purple-500/30 text-purple-300 px-3 py-1 rounded-xl">
+                  ⚡ {stats.xp} XP
+                </div>
+                <div onClick={() => saveStats({ ...stats, hearts: 5 })} title="Click to refill hearts" className="flex items-center gap-1 bg-slate-900 border border-rose-500/30 text-rose-400 px-3 py-1 rounded-xl cursor-pointer">
+                  ❤️ {stats.hearts}
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* PATH VIEW */}
+          {view === 'path' && (
+            <main className="max-w-md w-full mx-auto px-4 py-8 flex flex-col items-center">
+              <div className="w-full bg-slate-900/80 rounded-3xl p-5 border border-purple-500/30 shadow-xl mb-10 text-center">
+                <span className="text-[10px] font-bold tracking-widest text-cyan-400 uppercase">Quantum Curriculum</span>
+                <h2 className="text-xl font-extrabold text-white mt-0.5">Quantum Computing Skill Tree</h2>
+                <p className="text-xs text-slate-400 mt-1">Master qubits, gates, entanglement & Grover's search</p>
+              </div>
+
+              {/* Dotted path nodes */}
+              <div className="relative flex flex-col items-center space-y-12 pb-16 w-full">
+                {LEVELS.map((lvl, i) => {
+                  const isDone = stats.completed.includes(lvl.id);
+                  const isUnlocked = isDone || lvl.id === 1 || stats.completed.includes(lvl.id - 1);
+                  const stars = stats.levelStars[lvl.id] || 0;
+                  const offsets = [0, 60, -60, 60, -60, 0];
+                  const offX = offsets[i % offsets.length];
+
+                  return (
+                    <div key={lvl.id} className="flex flex-col items-center" style={{ transform: `translateX(${offX}px)` }}>
+                      <button
+                        onClick={() => isUnlocked && openLevel(lvl.id)}
+                        disabled={!isUnlocked}
+                        className={`w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 shadow-xl text-xl font-bold transition-transform active:scale-95 ${
+                          isDone
+                            ? 'bg-gradient-to-tr from-emerald-600 to-teal-400 border-emerald-300 shadow-emerald-500/30 hover:scale-105'
+                            : isUnlocked
+                            ? 'bg-gradient-to-tr from-purple-600 to-cyan-400 border-purple-300 shadow-purple-500/50 animate-pulse-glow hover:scale-110'
+                            : 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        {isDone ? '✓' : isUnlocked ? lvl.icon : '🔒'}
+                        {isDone && (
+                          <div className="flex text-[10px] text-amber-300 mt-0.5">
+                            {'★'.repeat(stars)}{'☆'.repeat(3 - stars)}
+                          </div>
+                        )}
+                      </button>
+
+                      <div className="text-center mt-2 max-w-[130px]">
+                        <span className="text-[10px] font-extrabold text-slate-400 block">Level {lvl.id}</span>
+                        <span className="text-xs font-bold text-slate-200 leading-tight">{lvl.title}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </main>
+          )}
+
+          {/* LESSON VIEW */}
+          {view === 'lesson' && (
+            <main className="max-w-2xl w-full mx-auto px-4 py-6 flex-1 flex flex-col justify-center">
+              {/* LESSON STEP 1: OVERVIEW */}
+              {lessonStep === 'overview' && (
+                <div className="bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-5 animate-fadeIn">
+                  <div className="flex justify-between items-center text-xs text-purple-400 font-bold uppercase">
+                    <span>{activeLevel.overview.tag}</span>
+                    <span>Level {activeLevel.id}</span>
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-white">{activeLevel.overview.heading}</h2>
+                  <p className="text-base text-slate-300 leading-relaxed">{activeLevel.overview.description}</p>
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-cyan-300">
+                    💡 <strong>Takeaway:</strong> {activeLevel.overview.takeaway}
+                  </div>
+                  <button
+                    onClick={() => setLessonStep('simulator')}
+                    className="w-full py-4 rounded-2xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 text-white shadow-lg shadow-purple-600/30 text-lg"
+                  >
+                    Continue to Simulator ➔
+                  </button>
+                </div>
+              )}
+
+              {/* LESSON STEP 2: SIMULATOR */}
+              {lessonStep === 'simulator' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-lg text-white">{activeLevel.simulator.title}</h3>
+                      <p className="text-xs text-slate-300">{activeLevel.simulator.instructions}</p>
+                    </div>
+                    <button
+                      onClick={() => setLessonStep('quiz')}
+                      className="px-5 py-2.5 rounded-xl font-bold bg-gradient-to-r from-cyan-500 to-purple-600 text-white text-sm shadow-md flex-shrink-0 ml-3"
+                    >
+                      Ready for Quiz ✓
+                    </button>
+                  </div>
+
+                  {/* Simulator Area */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                    {activeLevel.id === 4 || activeLevel.id === 6 ? (
+                      <ProbabilityBars probabilities={twoQubitProbs} isTwoQubit={true} />
+                    ) : (
+                      <>
+                        <BlochSphere state={qubitState} />
+                        <ProbabilityBars probabilities={singleProbs} />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Gate Controls */}
+                  <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-wrap gap-2 justify-center">
+                    {activeLevel.id < 4 && (
+                      <>
+                        <button onClick={() => setQubitState(applyGate(GATES.X, qubitState))} className="px-4 py-2 bg-cyan-900 border border-cyan-600 rounded-xl text-cyan-300 font-bold">X Gate</button>
+                        <button onClick={() => setQubitState(applyGate(GATES.H, qubitState))} className="px-4 py-2 bg-purple-900 border border-purple-600 rounded-xl text-purple-300 font-bold">H Gate</button>
+                        <button onClick={() => setQubitState(applyGate(GATES.Z, qubitState))} className="px-4 py-2 bg-blue-900 border border-blue-600 rounded-xl text-blue-300 font-bold">Z Gate</button>
+                        <button onClick={() => setQubitState([COMPLEX.create(1, 0), COMPLEX.create(0, 0)])} className="px-4 py-2 bg-slate-800 rounded-xl text-slate-300 text-xs">Reset |0⟩</button>
+                      </>
+                    )}
+                    {activeLevel.id === 4 && (
+                      <>
+                        <button onClick={() => { const g = [...twoQubitGates, { type: 'H', target: 0 }]; setTwoQubitGates(g); setTwoQubitProbs(simulateTwoQubit(g)); }} className="px-3 py-2 bg-purple-900 border border-purple-600 rounded-xl text-purple-300 font-bold text-xs">1. H on Q0</button>
+                        <button onClick={() => { const g = [...twoQubitGates, { type: 'CNOT' }]; setTwoQubitGates(g); setTwoQubitProbs(simulateTwoQubit(g)); }} className="px-3 py-2 bg-cyan-900 border border-cyan-600 rounded-xl text-cyan-300 font-bold text-xs">2. CNOT (Q0➔Q1)</button>
+                        <button onClick={() => { setTwoQubitGates([]); setTwoQubitProbs(simulateTwoQubit([])); }} className="px-3 py-2 bg-slate-800 rounded-xl text-slate-300 text-xs">Reset</button>
+                      </>
+                    )}
+                    {activeLevel.id === 5 && (
+                      <>
+                        <button onClick={() => {
+                          const outcome = Math.random() < singleProbs.raw0 ? '0' : '1';
+                          setShots(s => ({ c0: outcome === '0' ? s.c0 + 1 : s.c0, c1: outcome === '1' ? s.c1 + 1 : s.c1, total: s.total + 1 }));
+                          setQubitState(outcome === '0' ? [COMPLEX.create(1, 0), COMPLEX.create(0, 0)] : [COMPLEX.create(0, 0), COMPLEX.create(1, 0)]);
+                        }} className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs">Measure 1 Shot</button>
+                        <span className="text-xs font-mono text-slate-400 self-center">|0⟩ hits: {shots.c0} | |1⟩ hits: {shots.c1}</span>
+                      </>
+                    )}
+                    {activeLevel.id === 6 && (
+                      <>
+                        <button onClick={() => setTwoQubitProbs(simulateTwoQubit([{ type: 'H', target: 0 }, { type: 'H', target: 1 }]))} className="px-3 py-2 bg-purple-900 rounded-xl text-purple-300 text-xs font-bold">1. Superposition</button>
+                        <button onClick={() => setTwoQubitProbs(simulateTwoQubit([{ type: 'H', target: 0 }, { type: 'H', target: 1 }, { type: 'ORACLE_11' }]))} className="px-3 py-2 bg-amber-900 rounded-xl text-amber-300 text-xs font-bold">2. Oracle (|11⟩)</button>
+                        <button onClick={() => setTwoQubitProbs(simulateTwoQubit([{ type: 'H', target: 0 }, { type: 'H', target: 1 }, { type: 'ORACLE_11' }, { type: 'DIFFUSION' }]))} className="px-3 py-2 bg-pink-900 rounded-xl text-pink-300 text-xs font-bold">3. Diffusion (Amplify)</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* LESSON STEP 3: QUIZ */}
+              {lessonStep === 'quiz' && (
+                <div className="bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-5 animate-fadeIn">
+                  <span className="text-xs font-bold text-purple-400 uppercase">Knowledge Check (+10 XP)</span>
+                  <h3 className="text-xl font-bold text-white">{activeLevel.quiz.question}</h3>
+                  <div className="space-y-2">
+                    {activeLevel.quiz.options.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleQuiz(idx)}
+                        disabled={feedback !== null}
+                        className="w-full text-left p-4 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-purple-500 font-medium text-sm text-slate-200 transition-all"
+                      >
+                        <span className="w-6 h-6 rounded-lg bg-slate-800 inline-flex items-center justify-center font-bold text-xs text-purple-400 mr-3">
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LESSON STEP 4: RESULTS */}
+              {lessonStep === 'results' && (
+                <div className="bg-slate-900 rounded-3xl p-8 border border-slate-800 text-center space-y-6 animate-fadeIn">
+                  <div className="text-5xl">🎉</div>
+                  <h2 className="text-2xl font-extrabold text-white">Level Complete!</h2>
+                  <div className="text-3xl text-amber-400 font-bold">
+                    {'★'.repeat(mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1)}
+                  </div>
+                  <div className="text-purple-400 font-bold text-lg">+35 XP Earned</div>
+                  <button
+                    onClick={() => setView('path')}
+                    className="w-full py-4 rounded-2xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 text-white shadow-xl text-lg"
+                  >
+                    Back to Skill Tree
+                  </button>
+                </div>
+              )}
+            </main>
+          )}
+
+          {/* IMMEDIATE FEEDBACK BANNER */}
+          {feedback && (
+            <div className={`fixed bottom-0 left-0 right-0 p-5 border-t-2 z-50 animate-slideUp ${feedback.isCorrect ? 'bg-slate-950 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-rose-500 text-rose-300'}`}>
+              <div className="max-w-2xl mx-auto flex justify-between items-center gap-4">
+                <div>
+                  <h4 className="font-extrabold text-lg text-white">{feedback.isCorrect ? '✨ Correct!' : '❌ Not Quite'}</h4>
+                  <p className="text-xs text-slate-300">{feedback.text}</p>
+                </div>
+                <button
+                  onClick={handleContinueFromFeedback}
+                  className={`px-6 py-3 rounded-xl font-bold text-white shadow-md text-sm ${feedback.isCorrect ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-rose-600 hover:bg-rose-500'}`}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
