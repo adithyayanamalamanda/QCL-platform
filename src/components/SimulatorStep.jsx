@@ -330,10 +330,10 @@ export default function SimulatorStep({ level, onComplete }) {
                 <span className="text-xs text-slate-400">
                   {level.id === 4
                     ? twoQubitGates.some(g => g.type === 'CNOT')
-                      ? '✨ Entangled Bell Pair Formed: (|00⟩ + |11⟩)/√2'
+                      ? 'Entangled Bell Pair Formed: (|00⟩ + |11⟩)/√2'
                       : 'Apply H on Q0 then CNOT to entangle!'
                     : groverStep === 3
-                    ? '🎯 Target State |11⟩ Amplified with 100% Probability!'
+                    ? 'Target State |11⟩ Amplified with 100% Probability!'
                     : `Grover Step ${groverStep}/3 Active`}
                 </span>
               </div>

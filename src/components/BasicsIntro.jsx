@@ -6,7 +6,7 @@ export default function BasicsIntro({ onDone }) {
     }}>
       <div>
         <h1 className="gradient-text" style={{ fontSize: '3rem', marginBottom: '1rem' }}>
-          Welcome to QuantumQu ⚛️
+          Welcome to QuantumQuest
         </h1>
         <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>
           Let's build your quantum knowledge from the ground up.
