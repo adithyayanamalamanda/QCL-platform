@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='%2358cc02'/><text x='50' y='64' font-size='42' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='white'>Q</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuantumQuest — Interactive Quantum Computing Education</title>
+    <meta name="description" content="A professional Duolingo-style gamified quantum computing platform with interactive simulators, modules, exams, and quantum playground." />
+    
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              duo: {
+                green: '#58cc02',
+                greenDark: '#46a302',
+                greenLight: '#dcfce7',
+                blue: '#1cb0f6',
+                blueDark: '#1899d6',
+                blueLight: '#e0f2fe',
+                purple: '#8b5cf6',
+                purpleDark: '#7c3aed',
+                purpleLight: '#ede9fe',
+                amber: '#ff9600',
+                amberDark: '#e07b00',
+                amberLight: '#fef3c7',
+                rose: '#ff4b4b',
+                roseDark: '#ea2b2b',
+                roseLight: '#ffe4e6',
+                gray: '#e2e8f0',
+                grayDark: '#cbd5e1',
+                grayBg: '#f8fafc'
+              }
+            },
+            animation: {
+              'bounce-subtle': 'bounceSubtle 3s ease-in-out infinite',
+              'pulse-ring': 'pulseRing 2.5s infinite ease-in-out',
+              'slideUp': 'slideUp 0.3s ease-out',
+              'fadeIn': 'fadeIn 0.25s ease-out'
+            },
+            keyframes: {
+              bounceSubtle: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-5px)' }
+              },
+              pulseRing: {
+                '0%': { transform: 'scale(0.95)', opacity: '0.8' },
+                '50%': { transform: 'scale(1.1)', opacity: '0.3' },
+                '100%': { transform: 'scale(0.95)', opacity: '0.8' }
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(100%)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' }
+              },
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'scale(0.98)' },
+                '100%': { opacity: '1', transform: 'scale(1)' }
+              }
+            }
+          }
+        }
+      };
+    </script>
+    <script type="module" crossorigin src="./assets/index-6p0D8mnO.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CTBof2lS.css">
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white min-h-screen">
+    <div id="root"></div>
+  </body>
+</html>
