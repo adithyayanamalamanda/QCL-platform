@@ -1,15 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LEVELS_CONFIG } from '../data/levelsData';
-
-const GOOGLE_ICONS = {
-  Atom: 'science',
-  Zap: 'bolt',
-  GitBranch: 'alt_route',
-  Network: 'all_inclusive',
-  Activity: 'insights',
-  Sparkles: 'auto_awesome'
-};
+import { UNITS_CONFIG, LEVELS_56_DATA } from '../data/curriculum56';
+import GuidebookModal from './GuidebookModal';
+import AITutorModal from './AITutorModal';
 
 export default function PathScreen() {
   const navigate = useNavigate();
@@ -21,12 +14,17 @@ export default function PathScreen() {
   });
 
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const [guidebookModal, setGuidebookModal] = useState(null);
+  const [showGuidebook, setShowGuidebook] = useState(false);
+  const [showAITutor, setShowAITutor] = useState(false);
+  const [isExploreMode, setIsExploreMode] = useState(() => {
+    return localStorage.getItem('quantumExploreMode') === 'true';
+  });
 
   useEffect(() => {
     const updateStats = () => {
       const saved = localStorage.getItem('quantumQuestStats');
       if (saved) setStats(JSON.parse(saved));
+      setIsExploreMode(localStorage.getItem('quantumExploreMode') === 'true');
     };
     window.addEventListener('stats-updated', updateStats);
     window.addEventListener('storage', updateStats);
@@ -40,10 +38,14 @@ export default function PathScreen() {
   const levelStars = stats.levelStars || {};
 
   const getLevelStatus = (levelId) => {
+    if (isExploreMode) return completedSet.has(levelId) ? 'completed' : 'unlocked';
     if (completedSet.has(levelId)) return 'completed';
     if (levelId === 1 || completedSet.has(levelId - 1)) return 'unlocked';
     return 'locked';
   };
+
+  const currentActiveLevel =
+    LEVELS_56_DATA.find((l) => getLevelStatus(l.id) === 'unlocked') || LEVELS_56_DATA[0];
 
   const handleNodeClick = (level) => {
     const status = getLevelStatus(level.id);
@@ -54,38 +56,51 @@ export default function PathScreen() {
     }
   };
 
-  // Group levels into 2 Units
-  const units = [
-    {
-      id: 1,
-      title: "Unit 1: Quantum Foundations",
-      description: "Qubits, Superposition & Single-Qubit Gates",
-      color: "bg-duo-green",
-      borderColor: "border-duo-greenDark",
-      textColor: "text-emerald-800",
-      lightBg: "bg-emerald-50",
-      levels: LEVELS_CONFIG.slice(0, 3)
-    },
-    {
-      id: 2,
-      title: "Unit 2: Quantum Information & Algorithms",
-      description: "Entanglement, Bell States & Grover's Search",
-      color: "bg-duo-blue",
-      borderColor: "border-duo-blueDark",
-      textColor: "text-sky-800",
-      lightBg: "bg-sky-50",
-      levels: LEVELS_CONFIG.slice(3, 6)
-    }
-  ];
+  const totalDone = completedSet.size;
 
   return (
-    <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start select-none">
       
-      {/* Left / Center Column: The Duolingo Skill Tree Path */}
+      {/* Left Column: 10 Units and 56 Level Nodes */}
       <div className="lg:col-span-8 flex flex-col items-center space-y-12">
-        {units.map((unit) => {
-          const unitCompletedCount = unit.levels.filter(l => completedSet.has(l.id)).length;
-          const unitProgress = Math.round((unitCompletedCount / unit.levels.length) * 100);
+        
+        {/* Course Header Banner */}
+        <div className="w-full max-w-xl bg-white rounded-3xl p-6 border-2 border-slate-200 shadow-sm flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-duo-purple">
+              IBM-Aligned Quantum Curriculum
+            </span>
+            <h2 className="text-2xl font-black text-slate-900">
+              56-Level Quantum Journey
+            </h2>
+            <p className="text-xs text-slate-500 font-medium">
+              Zero foundations (1–10) ➔ Circuits & Entanglement ➔ Advanced Quantum Algorithms
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            <button
+              onClick={() => setShowGuidebook(true)}
+              className="btn-duo btn-duo-green px-4 py-2.5 text-xs uppercase tracking-wider flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-base">menu_book</span>
+              <span>Guidebook</span>
+            </button>
+            <button
+              onClick={() => setShowAITutor(true)}
+              className="btn-duo btn-duo-purple px-4 py-2 text-xs uppercase tracking-wider flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-base">smart_toy</span>
+              <span>AI Tutor</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 10 UNITS ITERATION */}
+        {UNITS_CONFIG.map((unit) => {
+          const unitLevels = LEVELS_56_DATA.filter((l) => l.unitId === unit.id);
+          const unitCompletedCount = unitLevels.filter((l) => completedSet.has(l.id)).length;
+          const unitProgress = Math.round((unitCompletedCount / unitLevels.length) * 100);
 
           return (
             <div key={unit.id} className="w-full max-w-xl space-y-8">
@@ -94,36 +109,49 @@ export default function PathScreen() {
               <div className={`${unit.color} rounded-3xl p-6 text-white shadow-sm border-b-4 ${unit.borderColor} flex items-center justify-between gap-4`}>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-extrabold uppercase tracking-widest bg-black/15 px-2.5 py-0.5 rounded-full">
+                    <span className="text-xs font-black uppercase tracking-widest bg-black/20 px-2.5 py-0.5 rounded-full">
                       {unit.title}
                     </span>
                     <span className="text-xs font-bold opacity-90">{unitProgress}% Complete</span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-black">
-                    {unit.description}
+                    {unit.subtitle}
                   </h3>
                 </div>
 
                 <button
-                  onClick={() => setGuidebookModal(unit)}
-                  className="px-4 py-2.5 rounded-2xl bg-white/20 hover:bg-white/30 active:scale-95 text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all flex-shrink-0"
+                  onClick={() => setShowGuidebook(true)}
+                  className="px-3.5 py-2 rounded-2xl bg-white/20 hover:bg-white/30 text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1 flex-shrink-0 transition-all active:scale-95"
                 >
                   <span className="material-symbols-outlined text-base">menu_book</span>
-                  <span>Guidebook</span>
+                  <span>Review</span>
                 </button>
               </div>
 
-              {/* Vertical Path for this unit */}
+              {/* Gateway Banner after Level 10 */}
+              {unit.id === 2 && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-100 to-indigo-100 border-2 border-purple-300 text-purple-950 flex items-center justify-between gap-3 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-3xl text-duo-purple">lock_open</span>
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-purple-800 block">
+                        Gateway Milestone Unlocked
+                      </span>
+                      <span className="text-xs font-bold text-slate-700">
+                        Entering Real Quantum Computing: Qubits, Statevectors & Gates
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Vertical Winding Path for this Unit */}
               <div className="relative flex flex-col items-center space-y-12 py-4">
-                {unit.levels.map((level, index) => {
+                {unitLevels.map((level, index) => {
                   const status = getLevelStatus(level.id);
                   const stars = levelStars[level.id] || 0;
-                  const iconName = GOOGLE_ICONS[level.icon] || 'science';
-
-                  // Alternating sine offsets: 0, 60, -60
-                  const offsets = [0, 65, -65];
+                  const offsets = [0, 65, -65, 65, -65, 0];
                   const offsetX = offsets[index % offsets.length];
-
                   const isCurrent = status === 'unlocked';
 
                   return (
@@ -132,12 +160,11 @@ export default function PathScreen() {
                       className="flex flex-col items-center relative transition-transform duration-300"
                       style={{ transform: `translateX(${offsetX}px)` }}
                     >
-                      {/* Active level pulsing ring indicator */}
                       {isCurrent && (
                         <div className="absolute -inset-2 rounded-full border-4 border-duo-green animate-pulse-ring pointer-events-none" />
                       )}
 
-                      {/* Level Node 3D Button */}
+                      {/* 3D Circular Level Node Button */}
                       <div className="relative group">
                         <button
                           onClick={() => handleNodeClick(level)}
@@ -153,13 +180,13 @@ export default function PathScreen() {
                           {status === 'completed' ? (
                             <span className="material-symbols-outlined text-3xl font-black">check</span>
                           ) : status === 'unlocked' ? (
-                            <span className="material-symbols-outlined text-3xl font-black">{iconName}</span>
+                            <span className="material-symbols-outlined text-3xl font-black">{level.icon}</span>
                           ) : (
                             <span className="material-symbols-outlined text-2xl font-bold">lock</span>
                           )}
                         </button>
 
-                        {/* Stars badge for completed levels */}
+                        {/* Star Rating Badge */}
                         {status === 'completed' && (
                           <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white px-2 py-0.5 rounded-full border-2 border-slate-200 shadow-sm">
                             {[1, 2, 3].map((s) => (
@@ -176,8 +203,8 @@ export default function PathScreen() {
                         )}
                       </div>
 
-                      {/* Level Label */}
-                      <div className="mt-3 text-center max-w-[140px]">
+                      {/* Level Title Label */}
+                      <div className="mt-3 text-center max-w-[150px]">
                         <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
                           Level {level.id}
                         </span>
@@ -197,10 +224,41 @@ export default function PathScreen() {
       {/* Right Column: Widgets & Quests */}
       <div className="lg:col-span-4 space-y-6 sticky top-20">
         
+        {/* Progress Overview Card */}
+        <div className="duo-card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-black text-slate-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-duo-green text-xl">analytics</span>
+              <span>Course Progress</span>
+            </h4>
+            <span className="text-xs font-black text-duo-green">{Math.round((totalDone / 56) * 100)}%</span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-slate-600">
+              <span>Levels Completed</span>
+              <span className="font-mono">{totalDone} / 56</span>
+            </div>
+            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+              <div
+                className="h-full bg-duo-green rounded-full transition-all duration-500"
+                style={{ width: `${(totalDone / 56) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/syllabus')}
+            className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-wider transition-colors"
+          >
+            View Full Course Syllabus ➔
+          </button>
+        </div>
+
         {/* Daily Quests Widget */}
         <div className="duo-card p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-extrabold text-slate-900 flex items-center gap-2">
+            <h4 className="font-black text-slate-900 flex items-center gap-2">
               <span className="material-symbols-outlined text-duo-amber text-xl">flag</span>
               <span>Daily Quests</span>
             </h4>
@@ -208,7 +266,6 @@ export default function PathScreen() {
           </div>
 
           <div className="space-y-3">
-            {/* Quest 1 */}
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-bold text-slate-700">
                 <span>Earn 50 XP</span>
@@ -222,10 +279,9 @@ export default function PathScreen() {
               </div>
             </div>
 
-            {/* Quest 2 */}
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-bold text-slate-700">
-                <span>Complete 1 Quantum Lesson</span>
+                <span>Complete 1 Quantum Level</span>
                 <span className="text-duo-green">{completedSet.size > 0 ? '1/1' : '0/1'}</span>
               </div>
               <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
@@ -238,99 +294,40 @@ export default function PathScreen() {
           </div>
         </div>
 
-        {/* Leaderboard Preview Widget */}
-        <div className="duo-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-extrabold text-slate-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-duo-purple text-xl">military_tech</span>
-              <span>Gold League</span>
-            </h4>
-            <button
-              onClick={() => navigate('/leaderboard')}
-              className="text-xs font-bold text-duo-blue hover:underline"
-            >
-              VIEW ALL
-            </button>
+        {/* AI Tutor Callout Widget */}
+        <div className="duo-card p-5 bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 space-y-3">
+          <div className="flex items-center gap-2 text-purple-950 font-black text-sm">
+            <span className="material-symbols-outlined text-duo-purple">smart_toy</span>
+            <span>Quantum AI Tutor</span>
           </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-2.5 rounded-2xl bg-duo-purpleLight border border-purple-200 text-xs font-extrabold text-purple-900">
-              <div className="flex items-center gap-2.5">
-                <span className="w-5 font-black text-purple-700">#4</span>
-                <div className="w-7 h-7 rounded-full bg-duo-purple text-white flex items-center justify-center font-bold text-xs">
-                  U
-                </div>
-                <span>You (@quantum_dev)</span>
-              </div>
-              <span>{stats.xp || 0} XP</span>
-            </div>
-
-            <p className="text-[11px] text-slate-500 text-center font-medium">
-              Top 10 advance to the Diamond League next week!
-            </p>
-          </div>
-        </div>
-
-        {/* Quantum Playground Quick Launch */}
-        <div className="duo-card p-5 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200 space-y-3">
-          <div className="flex items-center gap-2 text-indigo-900 font-extrabold text-sm">
-            <span className="material-symbols-outlined text-indigo-600">terminal</span>
-            <span>Quantum Circuit Playground</span>
-          </div>
-          <p className="text-xs text-indigo-700 leading-relaxed font-medium">
-            Test multi-qubit gates, measure superposition collapses, and export Python Qiskit code.
+          <p className="text-xs text-purple-800 leading-relaxed font-medium">
+            Have questions about amplitudes, Bell pairs, or Grover's algorithm? Ask your AI tutor anytime.
           </p>
           <button
-            onClick={() => navigate('/playground')}
-            className="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 border-2 border-indigo-700 text-white font-extrabold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm"
+            onClick={() => setShowAITutor(true)}
+            className="w-full btn-duo btn-duo-purple py-2.5 text-xs uppercase tracking-wider"
           >
-            Open Circuit Lab
+            Ask AI Tutor
           </button>
         </div>
       </div>
 
-      {/* Guidebook Modal */}
-      {guidebookModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full space-y-5 border-2 border-slate-200 shadow-2xl animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-duo-blue text-2xl">menu_book</span>
-                <h3 className="font-extrabold text-lg text-slate-900">{guidebookModal.title}</h3>
-              </div>
-              <button
-                onClick={() => setGuidebookModal(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 font-bold"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Modals */}
+      {showGuidebook && (
+        <GuidebookModal
+          onClose={() => setShowGuidebook(false)}
+          onSelectLevel={(lvl) => {
+            setShowGuidebook(false);
+            navigate(`/level/${lvl.id}`);
+          }}
+        />
+      )}
 
-            <div className="space-y-4 text-sm text-slate-700 max-h-96 overflow-y-auto pr-1">
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="text-xs font-bold text-slate-500 uppercase">Unit Summary</span>
-                <p className="font-medium text-slate-800">{guidebookModal.description}</p>
-              </div>
-
-              {guidebookModal.levels.map((lvl) => (
-                <div key={lvl.id} className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900">Level {lvl.id}: {lvl.title}</span>
-                    <span className="text-xs font-bold text-duo-purple">+{lvl.xpReward} XP</span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">{lvl.overview.description}</p>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setGuidebookModal(null)}
-              className="w-full py-3 rounded-2xl bg-duo-green border-2 border-duo-greenDark text-white font-extrabold text-sm uppercase tracking-wider"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
+      {showAITutor && (
+        <AITutorModal
+          currentLevelId={currentActiveLevel.id}
+          onClose={() => setShowAITutor(false)}
+        />
       )}
 
       {/* Locked Level Modal */}
@@ -344,16 +341,16 @@ export default function PathScreen() {
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Level {selectedLevel.id} Locked
               </span>
-              <h3 className="text-lg font-extrabold text-slate-900 mt-1">
+              <h3 className="text-lg font-black text-slate-900 mt-1">
                 {selectedLevel.title}
               </h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Complete Level {selectedLevel.id - 1} to unlock this quantum lesson!
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed font-medium">
+                Complete Level {selectedLevel.id - 1} to unlock this quantum lesson, or enable 'Explore Mode' in the Guidebook!
               </p>
             </div>
             <button
               onClick={() => setSelectedLevel(null)}
-              className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm uppercase tracking-wider"
+              className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase tracking-wider"
             >
               Close
             </button>

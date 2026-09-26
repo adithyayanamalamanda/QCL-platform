@@ -2,10 +2,12 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import PathScreen from './components/PathScreen';
+import SyllabusPage from './components/SyllabusPage';
 import Playground from './components/Playground';
 import Exams from './components/Exams';
 import Leaderboard from './components/Leaderboard';
 import Profile from './components/Profile';
+import VerifyCertificate from './components/VerifyCertificate';
 import LessonScreen from './components/LessonScreen';
 
 function App() {
@@ -35,11 +37,14 @@ function App() {
             <Route path="/" element={<PathScreen />} />
             <Route path="/learn" element={<PathScreen />} />
             <Route path="/map" element={<PathScreen />} />
+            <Route path="/syllabus" element={<SyllabusPage />} />
             <Route path="/playground" element={<Playground />} />
             <Route path="/practice" element={<Playground />} />
             <Route path="/exams" element={<Exams />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/verify" element={<VerifyCertificate />} />
+            <Route path="/verify/:certId" element={<VerifyCertificate />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -51,6 +56,10 @@ function App() {
           <span className="material-symbols-outlined text-2xl">school</span>
           <span>Learn</span>
         </a>
+        <a href="#/syllabus" className="flex flex-col items-center gap-0.5 text-xs font-bold text-slate-500 hover:text-slate-900">
+          <span className="material-symbols-outlined text-2xl">menu_book</span>
+          <span>Syllabus</span>
+        </a>
         <a href="#/playground" className="flex flex-col items-center gap-0.5 text-xs font-bold text-slate-500 hover:text-slate-900">
           <span className="material-symbols-outlined text-2xl">science</span>
           <span>Playground</span>
@@ -58,10 +67,6 @@ function App() {
         <a href="#/exams" className="flex flex-col items-center gap-0.5 text-xs font-bold text-slate-500 hover:text-slate-900">
           <span className="material-symbols-outlined text-2xl">assignment</span>
           <span>Exams</span>
-        </a>
-        <a href="#/leaderboard" className="flex flex-col items-center gap-0.5 text-xs font-bold text-slate-500 hover:text-slate-900">
-          <span className="material-symbols-outlined text-2xl">military_tech</span>
-          <span>Rank</span>
         </a>
         <a href="#/profile" className="flex flex-col items-center gap-0.5 text-xs font-bold text-slate-500 hover:text-slate-900">
           <span className="material-symbols-outlined text-2xl">account_circle</span>
