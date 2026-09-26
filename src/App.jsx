@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Landing from './components/Landing';
 import Map from './components/Map';
 import Level from './components/Level';
@@ -12,6 +12,7 @@ import AITutor from './components/AITutor';
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isFullScreen = location.pathname === '/' || location.pathname === '/intro';
 
   if (isFullScreen) {
@@ -21,7 +22,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/intro" element={
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-              <BasicsIntro onDone={() => window.location.href = '/map'} />
+              <BasicsIntro onDone={() => navigate('/map')} />
             </div>
           } />
         </Routes>
