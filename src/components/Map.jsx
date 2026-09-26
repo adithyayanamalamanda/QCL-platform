@@ -29,11 +29,11 @@ export default function Map() {
   };
 
   const MODULES = [
-    { id: 'm1', title: 'FOUNDATION', levels: ['1', '2', '3', '4', '5', '6', '7'] },
-    { id: 'm2', title: 'QUANTUM FOUNDATIONS', levels: ['8', '9', '10', '11', '12', '13', '14'] },
-    { id: 'm3', title: 'QUANTUM GATES', levels: ['15', '16', '17', '18', '19', '20', '21'] },
-    { id: 'm4', title: 'QUANTUM CIRCUITS', levels: ['22', '23', '24', '25', '26'] },
-    { id: 'm5', title: 'QUANTUM ALGORITHMS', levels: ['27', '28', '29', '30', '31', '32', '33'] },
+    { id: 'm1', title: 'FOUNDATION', levels: ['1', '2', '3', '4'] },
+    { id: 'm2', title: 'QUANTUM CORE', levels: ['5', '6', '7', '8', '9', '10', '11', '12', '13'] },
+    { id: 'm3', title: 'INTERMEDIATE', levels: ['14', '15', '16', '17'] },
+    { id: 'm4', title: 'ALGORITHMS', levels: ['18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28'] },
+    { id: 'm5', title: 'ADVANCED', levels: ['29', '30', '31'] },
   ];
 
   const getModuleProgress = (moduleLevels) => {

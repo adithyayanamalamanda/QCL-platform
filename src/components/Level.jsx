@@ -8,7 +8,7 @@ export default function Level() {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  const [phase, setPhase] = useState('predict'); // predict -> run -> result
+  const [phase, setPhase] = useState('learn'); // learn -> predict -> run -> result
   const [prediction, setPrediction] = useState(null);
   const [result, setResult] = useState(null);
 
@@ -112,10 +112,19 @@ export default function Level() {
 
       <header className="anim-slide-up" style={{ marginBottom: '3rem' }}>
         <h1 className="gradient-text anim-float" style={{ display: 'inline-block' }}>Level {id}: {levelData.title}</h1>
-        <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginTop: '1rem' }}>
-          {levelData.explanation}
-        </p>
       </header>
+
+      {phase === 'learn' && (
+        <div className="card anim-slide-up" style={{ marginBottom: '2rem', textAlign: 'center', padding: '3rem 2rem' }}>
+          <h2 style={{ fontSize: '2rem', marginBottom: '1.5rem', color: 'var(--text-main)' }}>Concept Overview</h2>
+          <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.6 }}>
+            {levelData.explanation}
+          </p>
+          <button className="btn btn-shine hover-lift" onClick={() => setPhase('predict')}>
+            Continue to Interactive Quiz
+          </button>
+        </div>
+      )}
 
       {phase === 'predict' && (
         <div className="card anim-slide-up" style={{ marginBottom: '2rem', animationDelay: '0.1s' }}>
